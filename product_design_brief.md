@@ -286,7 +286,6 @@ Support:
 - GitHub
 - Linear
 - Jira
-- Notion
 
 ---
 
@@ -337,7 +336,7 @@ The aesthetic should be inspired by **Typeform**.
 
 Aperture is:
 
-> A visual interface for understanding how software evolves through change.
+> A visual interface for understanding how software evolves.
 
 Or:
 

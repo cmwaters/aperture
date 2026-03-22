@@ -1,6 +1,13 @@
 # Aperture — Engineering Design Document
 
-> Status: Draft v0.1 | Author: Callum | Date: 2026-03-22
+> Status: Draft v0.2 | Author: Callum | Updated: 2026-03-22
+
+## Iteration Log
+
+| Version | Date | What was built |
+|---|---|---|
+| v0.1 | 2026-03-22 | Initial design document |
+| v0.2 | 2026-03-22 | Iteration 1: Auth, onboarding, repo connection, Activity View (queue) |
 
 ---
 
@@ -524,38 +531,36 @@ GITHUB_APP_NAME               -- for constructing install links
 
 Given a solo build targeting a couple dozen teams, the recommended sequence ships a usable product early and avoids over-engineering.
 
-### Phase 1 — Foundation (Weeks 1–3)
-- [ ] Scaffold monorepo (`/web`, `/api`, `/db`)
-- [ ] Supabase project setup: schema, RLS policies, Auth config
-- [ ] Go API server skeleton: chi router, auth middleware, Supabase client
-- [ ] Next.js skeleton: auth flow, team creation, basic layout shell
-- [ ] GitHub App registration and installation flow
-- [ ] Webhook handler: receive and verify GitHub events, upsert `pull_requests`
+### Phase 1 — Foundation ✅ Complete
+- [x] Scaffold monorepo (`/web`, `/api`, `/db`)
+- [x] DB schema + RLS policies (`db/migrations/001_initial.sql`)
+- [x] Go API server skeleton: chi router, auth middleware, Supabase client
+- [x] Next.js app: login page (GitHub OAuth via Supabase), auth callback
+- [x] Onboarding flow: team creation → GitHub App install → repo selection
+- [x] GitHub App client: JWT generation, installation token caching
+- [x] Webhook handler: signature verification, PR event upsert
+- [x] Activity View (queue): urgency-ranked PR list with state/size/risk badges
+- [x] Initial sync: fetch open PRs from GitHub on repo activation
 
-### Phase 2 — AI Pipeline (Weeks 4–5)
+### Phase 2 — AI Pipeline (next)
 - [ ] AI provider interface + Anthropic implementation
 - [ ] PR analysis pipeline: fetch diff → call AI → store `pr_analyses`
 - [ ] OpenAI implementation (swap-in, same interface)
-- [ ] Queue ranker: urgency scoring for open PRs
+- [ ] Queue ranker: incorporate AI risk score into urgency (currently defaults to 0.3)
 
-### Phase 3 — Activity View (Week 6)
-- [ ] Activity View UI: ranked PR queue with state, size, risk, impacted areas
-- [ ] Supabase Realtime subscription: live queue updates on webhook events
-- [ ] PR state badges (needs review / needs author / stalled / draft)
-
-### Phase 4 — PR Intelligence Panel (Weeks 7–8)
+### Phase 3 — PR Intelligence Panel
 - [ ] Context tab: AI summary, why, impacted areas, linked issue context
 - [ ] Changes tab: semantic group view → file list → line diff
 - [ ] Discussion tab: synced comments from GitHub
 - [ ] Actions tab: approve / comment / request changes (proxied through Go → GitHub API)
+- [ ] Supabase Realtime subscription: live queue updates on webhook events
 
-### Phase 5 — Insights View (Week 9)
+### Phase 4 — Insights View
 - [ ] Weekly `team_insights` computation job
 - [ ] Insights View UI: insight cards with trend deltas
 
-### Phase 6 — Settings & Polish (Week 10)
+### Phase 5 — Settings & Polish
 - [ ] Settings UI: team, repos, preferences, integrations
-- [ ] Onboarding flow for new teams
 - [ ] Linear integration (read-only context enrichment)
 - [ ] Performance pass, error states, empty states
 
