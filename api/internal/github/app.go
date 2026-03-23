@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -29,6 +30,9 @@ type cachedToken struct {
 }
 
 func NewAppClient(appID, privateKeyPEM string) (*AppClient, error) {
+	// Railway (and many env var stores) preserve literal \n rather than real
+	// newlines. Normalise before attempting PEM decode.
+	privateKeyPEM = strings.ReplaceAll(privateKeyPEM, `\n`, "\n")
 	block, _ := pem.Decode([]byte(privateKeyPEM))
 	if block == nil {
 		return nil, fmt.Errorf("failed to decode PEM block from GitHub App private key")
