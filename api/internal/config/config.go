@@ -11,10 +11,9 @@ type Config struct {
 	SupabaseURL            string
 	SupabaseServiceRoleKey string
 
-	GitHubAppClientID   string // Client ID from GitHub App settings (starts with "Iv") — used as JWT iss
 	GitHubAppPrivateKey string // RSA private key PEM
 	GitHubWebhookSecret string
-	GitHubClientID      string // OAuth Client ID (same as AppClientID, kept for Supabase config reference)
+	GitHubClientID      string // App Client ID (starts with "Iv") — used as JWT iss
 	GitHubClientSecret  string
 
 	AnthropicAPIKey string
@@ -28,11 +27,10 @@ func Load() (*Config, error) {
 		Port:                   getEnv("PORT", "8080"),
 		SupabaseURL:            mustGetEnv("SUPABASE_URL"),
 		SupabaseServiceRoleKey: mustGetEnv("SUPABASE_SERVICE_ROLE_KEY"),
-		GitHubAppClientID:      mustGetEnv("GITHUB_APP_CLIENT_ID"),
 		GitHubAppPrivateKey:    mustGetEnv("GITHUB_APP_PRIVATE_KEY"),
 		GitHubWebhookSecret:    mustGetEnv("GITHUB_WEBHOOK_SECRET"),
-		GitHubClientID:         getEnv("GITHUB_CLIENT_ID", ""),
-		GitHubClientSecret:     getEnv("GITHUB_CLIENT_SECRET", ""),
+		GitHubClientID:         mustGetEnv("GITHUB_CLIENT_ID"),
+		GitHubClientSecret:     mustGetEnv("GITHUB_CLIENT_SECRET"),
 		AnthropicAPIKey:        getEnv("ANTHROPIC_API_KEY", ""),
 		OpenAIAPIKey:           getEnv("OPENAI_API_KEY", ""),
 		FrontendURL:            getEnv("FRONTEND_URL", "http://localhost:3000"),
