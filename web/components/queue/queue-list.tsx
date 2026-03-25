@@ -7,7 +7,7 @@ interface Props {
 }
 
 export function QueueList({ items, teamSlug }: Props) {
-  if (items.length === 0) {
+  if (!items || items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
         <div className="h-12 w-12 rounded-full bg-neutral-100 flex items-center justify-center mb-4">

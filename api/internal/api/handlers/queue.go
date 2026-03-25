@@ -53,7 +53,7 @@ func (h *QueueHandler) GetQueue(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var items []models.QueueItem
+	items := []models.QueueItem{}
 	for rows.Next() {
 		var pr models.PullRequest
 		var analysis models.PRAnalysis
