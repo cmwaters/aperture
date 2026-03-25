@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -19,7 +20,7 @@ import (
 // AppClient handles GitHub App authentication: generating JWTs and
 // fetching/caching per-installation access tokens.
 type AppClient struct {
-	appID      string
+	appID      int64
 	privateKey *rsa.PrivateKey
 
 	mu     sync.Mutex
@@ -32,6 +33,10 @@ type cachedToken struct {
 }
 
 func NewAppClient(appID, privateKeyPEM string) (*AppClient, error) {
+	id, err := strconv.ParseInt(appID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid GitHub App ID %q: %w", appID, err)
+	}
 	// Railway (and many env var stores) preserve literal \n rather than real
 	// newlines. Normalise before attempting PEM decode.
 	privateKeyPEM = strings.ReplaceAll(privateKeyPEM, `\n`, "\n")
@@ -44,7 +49,7 @@ func NewAppClient(appID, privateKeyPEM string) (*AppClient, error) {
 		return nil, fmt.Errorf("failed to parse GitHub App private key: %w", err)
 	}
 	return &AppClient{
-		appID:      appID,
+		appID:      id,
 		privateKey: key,
 		tokens:     make(map[int64]*cachedToken),
 	}, nil
