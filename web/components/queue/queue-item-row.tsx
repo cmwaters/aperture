@@ -15,7 +15,7 @@ export function QueueItemRow({ item, teamSlug }: Props) {
 
   return (
     <Link
-      href={`/${teamSlug}/pr/${item.id}`}
+      href={`/orgs/${teamSlug}/pr/${item.id}`}
       className="group flex items-start gap-4 px-5 py-4 rounded-xl bg-white border border-neutral-100 hover:border-neutral-200 hover:shadow-sm transition-all"
     >
       {/* Author avatar */}
