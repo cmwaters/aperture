@@ -9,7 +9,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -21,7 +20,7 @@ import (
 // AppClient handles GitHub App authentication: generating JWTs and
 // fetching/caching per-installation access tokens.
 type AppClient struct {
-	appID      int64
+	clientID   string // GitHub App Client ID (e.g. "Iv23liXXXXXX") — used as JWT iss
 	privateKey *rsa.PrivateKey
 
 	mu     sync.Mutex
@@ -33,11 +32,11 @@ type cachedToken struct {
 	expiresAt time.Time
 }
 
-func NewAppClient(appID, privateKeyPEM string) (*AppClient, error) {
-	id, err := strconv.ParseInt(strings.TrimSpace(appID), 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("invalid GitHub App ID %q: %w", appID, err)
-	}
+// NewAppClient creates a GitHub App client.
+// clientID is the App's Client ID (shown on the App settings page, starts with "Iv").
+// privateKeyPEM is the RSA private key in PEM format (literal \n sequences are normalised).
+func NewAppClient(clientID, privateKeyPEM string) (*AppClient, error) {
+	clientID = strings.TrimSpace(clientID)
 	// Railway (and many env var stores) preserve literal \n rather than real
 	// newlines. Normalise before attempting PEM decode.
 	privateKeyPEM = strings.ReplaceAll(privateKeyPEM, `\n`, "\n")
@@ -45,32 +44,33 @@ func NewAppClient(appID, privateKeyPEM string) (*AppClient, error) {
 	if block == nil {
 		return nil, fmt.Errorf("failed to decode PEM block from GitHub App private key")
 	}
-	log.Printf("GitHub App client: id=%d, pem block type=%q, key bytes=%d", id, block.Type, len(block.Bytes))
+	log.Printf("GitHub App client: clientID=%q, pem block type=%q, key bytes=%d", clientID, block.Type, len(block.Bytes))
 	key, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(privateKeyPEM))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse GitHub App private key: %w", err)
 	}
 	return &AppClient{
-		appID:      id,
+		clientID:   clientID,
 		privateKey: key,
 		tokens:     make(map[int64]*cachedToken),
 	}, nil
 }
 
 // generateJWT produces a short-lived (9min) JWT for GitHub App authentication.
+// GitHub requires the iss claim to be the App's Client ID (not the numeric App ID)
+// as of their 2025 JWT authentication update.
 func (a *AppClient) generateJWT() (string, error) {
 	now := time.Now()
 	claims := jwt.MapClaims{
 		"iat": now.Add(-30 * time.Second).Unix(), // issued slightly in the past to avoid clock skew
 		"exp": now.Add(9 * time.Minute).Unix(),
-		"iss": a.appID,
+		"iss": a.clientID,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	signed, err := token.SignedString(a.privateKey)
 	if err != nil {
 		return "", fmt.Errorf("signing JWT: %w", err)
 	}
-	log.Printf("generated JWT (full): %s", signed)
 	return signed, nil
 }
 
