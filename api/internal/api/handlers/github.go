@@ -140,7 +140,7 @@ func (h *GitHubHandler) HandleInstallationCallback(w http.ResponseWriter, r *htt
 	installation, err := h.AppClient.GetInstallation(ctx, installationID)
 	if err != nil {
 		log.Printf("failed to fetch installation details: %v", err)
-		http.Error(w, "failed to fetch installation details", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("failed to fetch installation details: %v", err), http.StatusInternalServerError)
 		return
 	}
 

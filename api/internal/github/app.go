@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -139,7 +140,8 @@ func (a *AppClient) GetInstallation(ctx context.Context, installationID int64) (
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status %d fetching installation", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status %d fetching installation: %s", resp.StatusCode, string(body))
 	}
 	var inst GHInstallation
 	if err := json.NewDecoder(resp.Body).Decode(&inst); err != nil {
