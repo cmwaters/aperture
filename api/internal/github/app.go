@@ -70,15 +70,8 @@ func (a *AppClient) generateJWT() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("signing JWT: %w", err)
 	}
-	log.Printf("generated JWT: length=%d, first20=%q", len(signed), signed[:min(20, len(signed))])
+	log.Printf("generated JWT (full): %s", signed)
 	return signed, nil
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // InstallationToken returns a valid access token for the given installation,
