@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -33,7 +34,7 @@ type cachedToken struct {
 }
 
 func NewAppClient(appID, privateKeyPEM string) (*AppClient, error) {
-	id, err := strconv.ParseInt(appID, 10, 64)
+	id, err := strconv.ParseInt(strings.TrimSpace(appID), 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("invalid GitHub App ID %q: %w", appID, err)
 	}
@@ -44,6 +45,7 @@ func NewAppClient(appID, privateKeyPEM string) (*AppClient, error) {
 	if block == nil {
 		return nil, fmt.Errorf("failed to decode PEM block from GitHub App private key")
 	}
+	log.Printf("GitHub App client: id=%d, pem block type=%q, key bytes=%d", id, block.Type, len(block.Bytes))
 	key, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(privateKeyPEM))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse GitHub App private key: %w", err)
@@ -64,7 +66,19 @@ func (a *AppClient) generateJWT() (string, error) {
 		"iss": a.appID,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	return token.SignedString(a.privateKey)
+	signed, err := token.SignedString(a.privateKey)
+	if err != nil {
+		return "", fmt.Errorf("signing JWT: %w", err)
+	}
+	log.Printf("generated JWT: length=%d, first20=%q", len(signed), signed[:min(20, len(signed))])
+	return signed, nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // InstallationToken returns a valid access token for the given installation,
