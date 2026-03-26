@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { apiFetch } from "@/lib/api";
-import { Team } from "@/lib/types";
+import { Organization } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
 
 export default async function RootPage() {
   const supabase = await createClient();
@@ -21,17 +23,17 @@ export default async function RootPage() {
   }
 
   try {
-    const { teams } = await apiFetch<{ teams: Team[] }>(
-      "/api/v1/me/teams",
+    const { orgs } = await apiFetch<{ orgs: Organization[] }>(
+      "/api/v1/me/orgs",
       token
     );
 
-    if (teams.length === 0) {
-      redirect("/onboarding");
+    if (orgs && orgs.length > 0) {
+      redirect(`/orgs/${orgs[0].slug}`);
     }
-
-    redirect(`/${teams[0].slug}`);
   } catch {
-    redirect("/onboarding");
+    // Fall through to onboarding
   }
+
+  redirect("/onboarding");
 }
