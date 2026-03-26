@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { OrgSwitcher } from "./org-switcher";
 
 interface Props {
   orgSlug: string;
@@ -25,18 +26,9 @@ export function AppHeader({ orgSlug, activeTab = "queue" }: Props) {
             >
               Queue
             </Link>
-            <Link
-              href={`/orgs/${orgSlug}/settings`}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                activeTab === "settings"
-                  ? "text-neutral-900 bg-neutral-100"
-                  : "text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50"
-              }`}
-            >
-              Settings
-            </Link>
           </nav>
         </div>
+        <OrgSwitcher currentOrgSlug={orgSlug} />
       </div>
     </header>
   );
