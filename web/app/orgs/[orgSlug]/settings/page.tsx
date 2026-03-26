@@ -115,7 +115,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      <AppHeader orgSlug={orgSlug} />
+      <AppHeader orgSlug={orgSlug} activeTab="settings" />
 
       {/* Org switcher bar */}
       <div className="max-w-3xl mx-auto px-6 pt-8 pb-2">

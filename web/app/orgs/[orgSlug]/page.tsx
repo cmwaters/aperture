@@ -2,9 +2,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { apiFetch } from "@/lib/api";
 import { QueueResponse } from "@/lib/types";
-import { QueueList } from "@/components/queue/queue-list";
 import { AppHeader } from "@/components/layout/app-header";
-import { RefreshButton } from "@/components/queue/refresh-button";
+import { ReviewQueuePanel } from "@/components/queue/queue-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -12,12 +11,11 @@ interface Props {
   params: Promise<{ orgSlug: string }>;
 }
 
-export default async function ActivityPage({ params }: Props) {
+export default async function FlowPage({ params }: Props) {
   const { orgSlug } = await params;
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-
   if (!user) redirect("/login");
 
   const { data: session } = await supabase.auth.getSession();
@@ -26,33 +24,24 @@ export default async function ActivityPage({ params }: Props) {
 
   let queue: QueueResponse = { items: [], total: 0 };
   try {
-    queue = await apiFetch<QueueResponse>(
-      `/api/v1/orgs/${orgSlug}/queue`,
-      token
-    );
+    queue = await apiFetch<QueueResponse>(`/api/v1/orgs/${orgSlug}/queue`, token);
   } catch (err) {
     console.error("Failed to load queue:", err);
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <AppHeader orgSlug={orgSlug} activeTab="queue" />
-      <main className="max-w-3xl mx-auto px-6 py-10">
-        <div className="mb-8 flex items-start justify-between">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-neutral-900">
-              Queue
-            </h1>
-            <p className="text-sm text-neutral-500 mt-1">
-              {queue.total === 0
-                ? "All clear — no open pull requests."
-                : `${queue.total} open pull request${queue.total === 1 ? "" : "s"}, ranked by urgency.`}
-            </p>
-          </div>
-          <RefreshButton />
-        </div>
-        <QueueList items={queue.items} teamSlug={orgSlug} />
-      </main>
+    <div className="h-screen flex flex-col bg-neutral-50">
+      <AppHeader orgSlug={orgSlug} activeTab="flow" />
+      <div className="flex flex-1 min-h-0">
+        {/* Flow */}
+        <main className="flex-1 overflow-y-auto px-10 py-10">
+          <h1 className="text-xl font-semibold text-neutral-900">Flow</h1>
+          <p className="text-sm text-neutral-400 mt-1">Coming soon.</p>
+        </main>
+
+        {/* Review Queue panel */}
+        <ReviewQueuePanel items={queue.items} total={queue.total} orgSlug={orgSlug} />
+      </div>
     </div>
   );
 }
