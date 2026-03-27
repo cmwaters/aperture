@@ -18,6 +18,15 @@ export interface Team {
   created_at: string;
 }
 
+export interface OrgMember {
+  id: string;
+  display_name?: string;
+  avatar_url?: string;
+  github_username?: string;
+  email: string;
+  role: "org_admin" | "member";
+}
+
 export interface Repository {
   id: string;
   org_id: string;

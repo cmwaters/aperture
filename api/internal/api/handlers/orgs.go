@@ -3,12 +3,16 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
+	"strings"
 
 	"github.com/aperture/api/internal/github"
 	"github.com/aperture/api/internal/models"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+var slugRe = regexp.MustCompile(`[^a-z0-9]+`)
 
 type OrgHandler struct {
 	DB        *pgxpool.Pool
@@ -255,6 +259,134 @@ func (h *OrgHandler) ListTeams(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"teams": teams})
+}
+
+// POST /api/v1/orgs/{orgSlug}/teams
+func (h *OrgHandler) CreateTeam(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	orgSlug := chi.URLParam(r, "orgSlug")
+	userID := r.Header.Get("X-User-ID")
+
+	var orgID string
+	if err := h.DB.QueryRow(ctx, `select id from organizations where slug = $1`, orgSlug).Scan(&orgID); err != nil {
+		http.Error(w, "org not found", http.StatusNotFound)
+		return
+	}
+
+	// Only org admins may create teams.
+	var isAdmin bool
+	h.DB.QueryRow(ctx, `select exists(select 1 from org_members where org_id=$1 and user_id=$2 and role='org_admin')`, orgID, userID).Scan(&isAdmin)
+	if !isAdmin {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Name) == "" {
+		http.Error(w, "name required", http.StatusBadRequest)
+		return
+	}
+	name := strings.TrimSpace(body.Name)
+	slug := slugRe.ReplaceAllString(strings.ToLower(name), "-")
+	slug = strings.Trim(slug, "-")
+
+	var t models.Team
+	err := h.DB.QueryRow(ctx, `
+		insert into teams (org_id, name, slug)
+		values ($1, $2, $3)
+		on conflict (org_id, slug) do update set name = excluded.name
+		returning id, org_id, name, slug, github_team_id, created_at
+	`, orgID, name, slug).Scan(&t.ID, &t.OrgID, &t.Name, &t.Slug, &t.GitHubTeamID, &t.CreatedAt)
+	if err != nil {
+		http.Error(w, "failed to create team", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(t)
+}
+
+// DELETE /api/v1/orgs/{orgSlug}/teams/{teamID}
+func (h *OrgHandler) DeleteTeam(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	orgSlug := chi.URLParam(r, "orgSlug")
+	teamID := chi.URLParam(r, "teamID")
+	userID := r.Header.Get("X-User-ID")
+
+	var orgID string
+	if err := h.DB.QueryRow(ctx, `select id from organizations where slug = $1`, orgSlug).Scan(&orgID); err != nil {
+		http.Error(w, "org not found", http.StatusNotFound)
+		return
+	}
+
+	var isAdmin bool
+	h.DB.QueryRow(ctx, `select exists(select 1 from org_members where org_id=$1 and user_id=$2 and role='org_admin')`, orgID, userID).Scan(&isAdmin)
+	if !isAdmin {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	_, err := h.DB.Exec(ctx, `delete from teams where id = $1 and org_id = $2`, teamID, orgID)
+	if err != nil {
+		http.Error(w, "failed to delete team", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// GET /api/v1/orgs/{orgSlug}/members
+// Returns org members who have signed up for Aperture (user row exists).
+func (h *OrgHandler) ListOrgMembers(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	orgSlug := chi.URLParam(r, "orgSlug")
+
+	var orgID string
+	if err := h.DB.QueryRow(ctx, `select id from organizations where slug = $1`, orgSlug).Scan(&orgID); err != nil {
+		http.Error(w, "org not found", http.StatusNotFound)
+		return
+	}
+
+	rows, err := h.DB.Query(ctx, `
+		select
+			u.id, u.display_name, u.avatar_url, u.github_username, u.email,
+			om.role, om.created_at
+		from org_members om
+		join users u on u.id = om.user_id
+		where om.org_id = $1
+		order by om.role desc, u.github_username asc
+	`, orgID)
+	if err != nil {
+		http.Error(w, "failed to fetch members", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type Member struct {
+		ID             string  `json:"id"`
+		DisplayName    *string `json:"display_name,omitempty"`
+		AvatarURL      *string `json:"avatar_url,omitempty"`
+		GitHubUsername *string `json:"github_username,omitempty"`
+		Email          string  `json:"email"`
+		Role           string  `json:"role"`
+	}
+
+	var members []Member
+	for rows.Next() {
+		var m Member
+		var joinedAt interface{}
+		if err := rows.Scan(&m.ID, &m.DisplayName, &m.AvatarURL, &m.GitHubUsername, &m.Email, &m.Role, &joinedAt); err == nil {
+			members = append(members, m)
+		}
+	}
+	if members == nil {
+		members = []Member{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"members": members})
 }
 
 // GET /api/v1/auth/status?github_token=...
