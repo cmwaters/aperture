@@ -3,7 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { apiFetch } from "@/lib/api";
 import { PullRequest } from "@/lib/types";
-import { AppHeader } from "@/components/layout/app-header";
+import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -39,9 +39,10 @@ export default async function PRPage({ params }: Props) {
   });
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <AppHeader orgSlug={orgSlug} activeTab="flow" />
-      <main className="max-w-3xl mx-auto px-6 py-10">
+    <div className="h-screen flex bg-neutral-50">
+      <AppSidebar orgSlug={orgSlug} activeTab="queue" />
+      <main className="flex-1 overflow-y-auto">
+      <div className="max-w-3xl mx-auto px-6 py-10">
 
         {/* Back */}
         <Link
@@ -167,6 +168,7 @@ export default async function PRPage({ params }: Props) {
             <p className="text-sm text-neutral-600 leading-relaxed whitespace-pre-wrap">{pr.body}</p>
           </div>
         )}
+      </div>
       </main>
     </div>
   );

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { AppHeader } from "@/components/layout/app-header";
+import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Organization, Repository } from "@/lib/types";
 
 const GITHUB_APP_NAME_ENV = process.env.NEXT_PUBLIC_GITHUB_APP_NAME;
@@ -114,9 +114,10 @@ export default function SettingsPage() {
   }, [token, router]);
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <AppHeader orgSlug={orgSlug} activeTab="settings" />
+    <div className="h-screen flex bg-neutral-50">
+      <AppSidebar orgSlug={orgSlug} activeTab="queue" />
 
+      <div className="flex-1 overflow-y-auto">
       {/* Org switcher bar */}
       <div className="max-w-3xl mx-auto px-6 pt-8 pb-2">
         <div className="flex items-center gap-1 flex-wrap">
@@ -348,6 +349,7 @@ export default function SettingsPage() {
           </section>
         )}
       </main>
+      </div>
     </div>
   );
 }
