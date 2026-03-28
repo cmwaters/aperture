@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AppSidebar } from "@/components/layout/app-sidebar";
-import { Repository, Team, OrgMember } from "@/lib/types";
+import { Repository, Team, OrgMember, Organization } from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 const GITHUB_APP_NAME = process.env.NEXT_PUBLIC_GITHUB_APP_NAME;
@@ -15,12 +15,14 @@ export default function SettingsPage() {
   const orgSlug = params.orgSlug as string;
 
   const [token, setToken] = useState<string | null>(null);
+  const [org, setOrg] = useState<Organization | null>(null);
   const [repos, setRepos] = useState<Repository[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [members, setMembers] = useState<OrgMember[]>([]);
   const [loadingRepos, setLoadingRepos] = useState(true);
   const [loadingTeams, setLoadingTeams] = useState(true);
   const [loadingMembers, setLoadingMembers] = useState(true);
+  const isOrgAccount = org?.github_account_type === "Organization";
   const [syncing, setSyncing] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -42,6 +44,11 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!token) return;
+
+    fetch(`${API_URL}/api/v1/orgs/${orgSlug}/`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d) setOrg(d); })
+      .catch(() => {});
 
     setLoadingRepos(true);
     fetch(`${API_URL}/api/v1/orgs/${orgSlug}/repos`, { headers: { Authorization: `Bearer ${token}` } })
@@ -224,8 +231,8 @@ export default function SettingsPage() {
             </p>
           </section>
 
-          {/* ── Teams ── */}
-          <section>
+          {/* ── Teams — org accounts only ── */}
+          {isOrgAccount && <section>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-neutral-900">Teams</h2>
               <button
@@ -291,10 +298,10 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
-          </section>
+          </section>}
 
-          {/* ── Members ── */}
-          <section>
+          {/* ── Members — org accounts only ── */}
+          {isOrgAccount && <section>
             <h2 className="text-sm font-semibold text-neutral-900 mb-3">Members</h2>
             <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
               {loadingMembers ? (
@@ -335,7 +342,7 @@ export default function SettingsPage() {
             <p className="text-xs text-neutral-400 mt-2">
               Only members who have signed into Aperture are listed.
             </p>
-          </section>
+          </section>}
 
           {/* ── Account ── */}
           <section>
