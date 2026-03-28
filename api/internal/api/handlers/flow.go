@@ -78,11 +78,13 @@ func (h *FlowHandler) queryWeeklyStats(ctx context.Context, orgID string) []Week
 
 	rows, err := h.DB.Query(ctx, `
 		WITH
-		-- First review for each PR (any state including commented)
+		-- First review for each PR, only from Aperture org members (excludes bots)
 		first_reviews AS (
-			SELECT pull_request_id, MIN(submitted_at) AS first_review_at
-			FROM pr_reviews
-			GROUP BY pull_request_id
+			SELECT prv.pull_request_id, MIN(prv.submitted_at) AS first_review_at
+			FROM pr_reviews prv
+			JOIN users u ON lower(u.github_username) = lower(prv.reviewer_login)
+			JOIN org_members om ON om.user_id = u.id AND om.org_id = $1
+			GROUP BY prv.pull_request_id
 		),
 		-- Hours from PR open to first review, bucketed by week opened
 		pr_ttfr AS (
