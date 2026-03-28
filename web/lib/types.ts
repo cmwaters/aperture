@@ -154,8 +154,21 @@ export interface FlowReviewer {
   authored_prs: number;
 }
 
+export interface WeekStat {
+  week: string;           // ISO date "yyyy-mm-dd", Monday of the week
+  reviewed_count: number; // PRs opened that week that received at least one review
+  merged_count: number;   // PRs merged during this calendar week
+  min?: number;
+  q1?: number;
+  median?: number;
+  mean?: number;
+  q3?: number;
+  max?: number;
+}
+
 export interface FlowResponse {
   prs: FlowPR[];
   reviewers: FlowReviewer[];
+  weekly_stats: WeekStat[];
   period_days: number;
 }

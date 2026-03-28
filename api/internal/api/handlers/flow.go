@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -51,10 +52,119 @@ type FlowReviewer struct {
 	AuthoredPRs      int     `json:"authored_prs"`
 }
 
+type WeekStat struct {
+	Week          string   `json:"week"`           // Monday ISO date yyyy-mm-dd
+	ReviewedCount int      `json:"reviewed_count"` // PRs opened this week that got at least one review
+	MergedCount   int      `json:"merged_count"`   // PRs merged this calendar week
+	Min           *float64 `json:"min,omitempty"`
+	Q1            *float64 `json:"q1,omitempty"`
+	Median        *float64 `json:"median,omitempty"`
+	Mean          *float64 `json:"mean,omitempty"`
+	Q3            *float64 `json:"q3,omitempty"`
+	Max           *float64 `json:"max,omitempty"`
+}
+
 type FlowResponse struct {
-	PRs        []FlowPR       `json:"prs"`
-	Reviewers  []FlowReviewer `json:"reviewers"`
-	PeriodDays int            `json:"period_days"`
+	PRs         []FlowPR       `json:"prs"`
+	Reviewers   []FlowReviewer `json:"reviewers"`
+	WeeklyStats []WeekStat     `json:"weekly_stats"`
+	PeriodDays  int            `json:"period_days"`
+}
+
+// ── Weekly stats helper ───────────────────────────────────────────────────────
+
+func (h *FlowHandler) queryWeeklyStats(ctx context.Context, orgID string) []WeekStat {
+	since := time.Now().UTC().AddDate(0, 0, -7*12) // last 12 weeks
+
+	rows, err := h.DB.Query(ctx, `
+		WITH
+		-- First review for each PR (any state including commented)
+		first_reviews AS (
+			SELECT pull_request_id, MIN(submitted_at) AS first_review_at
+			FROM pr_reviews
+			GROUP BY pull_request_id
+		),
+		-- Hours from PR open to first review, bucketed by week opened
+		pr_ttfr AS (
+			SELECT
+				date_trunc('week', pr.opened_at)::date AS week_start,
+				GREATEST(
+					EXTRACT(EPOCH FROM (fr.first_review_at - pr.opened_at)) / 3600.0,
+					0
+				) AS hrs
+			FROM pull_requests pr
+			JOIN first_reviews fr ON fr.pull_request_id = pr.id
+			WHERE pr.org_id   = $1
+			  AND pr.draft    = false
+			  AND pr.opened_at >= $2
+			  AND fr.first_review_at > pr.opened_at
+		),
+		-- PRs merged, bucketed by week of merge
+		merged_pw AS (
+			SELECT
+				date_trunc('week', merged_at)::date AS week_start,
+				COUNT(*) AS merged_count
+			FROM pull_requests
+			WHERE org_id   = $1
+			  AND draft    = false
+			  AND merged_at IS NOT NULL
+			  AND merged_at >= $2
+			GROUP BY 1
+		),
+		-- Generate every week in range so we have no gaps
+		weeks AS (
+			SELECT generate_series(
+				date_trunc('week', $2::timestamptz)::date,
+				date_trunc('week', now())::date,
+				'1 week'
+			)::date AS week_start
+		)
+		SELECT
+			w.week_start,
+			COUNT(t.hrs)::int                                                   AS reviewed_count,
+			COALESCE(mpw.merged_count, 0)::int                                  AS merged_count,
+			MIN(t.hrs)                                                          AS min_hrs,
+			PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY t.hrs)                AS q1,
+			PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY t.hrs)                AS median,
+			AVG(t.hrs)                                                          AS mean,
+			PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY t.hrs)                AS q3,
+			MAX(t.hrs)                                                          AS max_hrs
+		FROM weeks w
+		LEFT JOIN pr_ttfr    t   ON t.week_start   = w.week_start
+		LEFT JOIN merged_pw  mpw ON mpw.week_start = w.week_start
+		GROUP BY w.week_start, mpw.merged_count
+		ORDER BY w.week_start
+	`, orgID, since)
+	if err != nil {
+		log.Printf("queryWeeklyStats: %v", err)
+		return nil
+	}
+	defer rows.Close()
+
+	var stats []WeekStat
+	for rows.Next() {
+		var s WeekStat
+		var weekDate time.Time
+		var reviewedCount, mergedCount int
+		var minH, q1, median, mean, q3, maxH *float64
+		if err := rows.Scan(&weekDate, &reviewedCount, &mergedCount, &minH, &q1, &median, &mean, &q3, &maxH); err != nil {
+			continue
+		}
+		s.Week = weekDate.Format("2006-01-02")
+		s.ReviewedCount = reviewedCount
+		s.MergedCount = mergedCount
+		s.Min = minH
+		s.Q1 = q1
+		s.Median = median
+		s.Mean = mean
+		s.Q3 = q3
+		s.Max = maxH
+		stats = append(stats, s)
+	}
+	if stats == nil {
+		stats = []WeekStat{}
+	}
+	return stats
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -260,10 +370,14 @@ func (h *FlowHandler) GetFlow(w http.ResponseWriter, r *http.Request) {
 		return flowReviewers[i].Reviews > flowReviewers[j].Reviews
 	})
 
+	// ── Weekly stats (last 12 weeks, independent of period filter) ───────────
+	weeklyStats := h.queryWeeklyStats(ctx, orgID)
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(FlowResponse{
-		PRs:        flowPRs,
-		Reviewers:  flowReviewers,
-		PeriodDays: periodDays,
+		PRs:         flowPRs,
+		Reviewers:   flowReviewers,
+		WeeklyStats: weeklyStats,
+		PeriodDays:  periodDays,
 	})
 }

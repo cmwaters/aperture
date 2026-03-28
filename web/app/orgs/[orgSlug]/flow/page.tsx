@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { apiFetch } from "@/lib/api";
 import { FlowResponse, FlowPR, FlowReviewer } from "@/lib/types";
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { TimeToReviewChart } from "@/components/flow/time-to-review-chart";
 
 const PERIODS = [
   { label: "7d", value: 7 },
@@ -20,7 +21,7 @@ export default function FlowPage() {
   const [data, setData] = useState<FlowResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState(7);
-  const [tab, setTab] = useState<"prs" | "reviewers">("prs");
+  const [tab, setTab] = useState<"chart" | "prs" | "reviewers">("chart");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -76,6 +77,9 @@ export default function FlowPage() {
 
           {/* Tab switcher */}
           <div className="flex items-center gap-1 border-b border-neutral-200 mb-6">
+            <TabButton active={tab === "chart"} onClick={() => setTab("chart")}>
+              Chart
+            </TabButton>
             <TabButton active={tab === "prs"} onClick={() => setTab("prs")}>
               PRs {data && <span className="ml-1 text-neutral-400">({data.prs.length})</span>}
             </TabButton>
@@ -88,6 +92,12 @@ export default function FlowPage() {
             <div className="flex items-center justify-center py-24">
               <div className="h-4 w-4 border-2 border-neutral-300 border-t-neutral-600 rounded-full animate-spin" />
             </div>
+          ) : tab === "chart" ? (
+            data?.weekly_stats?.length ? (
+              <TimeToReviewChart data={data.weekly_stats} />
+            ) : (
+              <EmptyState />
+            )
           ) : !data || data.prs.length === 0 ? (
             <EmptyState />
           ) : tab === "prs" ? (
